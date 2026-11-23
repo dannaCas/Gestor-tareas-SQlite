@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/tarea.dart';
+import '../data/tareas_database.dart';
 
 // Pantalla base SIN persistencia ni operaciones CRUD implementadas.
 // Conserva las indicaciones TODO para orientar tu trabajo.
@@ -15,15 +16,62 @@ class _TareasPageState extends State<TareasPage> {
 
   List<Tarea> _tareas = [];
 
-  @override
+  final TareasDatabase _db = TareasDatabase();
+
+
+@override
   void initState() {
     super.initState();
-
+    _cargarTareas();
   }
 
-  void _agregarTarea() {
-    _pendiente('Implementar registro de tarea');
+  // Recupera las tareas almacenadas en SQLite.
+  Future<void> _cargarTareas() async {
+    try {
+      final registros = await _db.consultarTareas();
+
+      if (!mounted) return;
+
+      setState(() {
+        _tareas = registros.map((registro) {
+          return Tarea(
+            id: registro.id,
+            titulo: registro.titulo,
+            completada: registro.completada,
+          );
+        }).toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _pendiente('Error al consultar tareas: $e');
+    }
   }
+
+
+
+Future<void> _agregarTarea() async {
+    final titulo = _tituloController.text;
+
+    try {
+      // Guardar la tarea
+      await _db.agregarTarea(titulo);
+
+      if (!mounted) return;
+
+      // Limpiar el campo de texto.
+      _tituloController.clear();
+
+      // Actualizar la lista con los datos guardados.
+      await _cargarTareas();
+    } on ArgumentError {
+      if (!mounted) return;
+      _pendiente('Escribe un título válido.');
+    } catch (e) {
+      if (!mounted) return;
+      _pendiente('Error al guardar la tarea: $e');
+    }
+  }
+
 
   void _alternarCompletada(Tarea tarea, bool completada) {
     _pendiente('Implementar actualización de tarea');
@@ -46,6 +94,7 @@ class _TareasPageState extends State<TareasPage> {
   @override
   void dispose() {
     _tituloController.dispose();
+    _db.close(); // Cerrar la conexión cuando se destruye la pantalla
     super.dispose();
   }
 
