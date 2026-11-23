@@ -25,7 +25,7 @@ class _TareasPageState extends State<TareasPage> {
     _cargarTareas();
   }
 
-  // Recupera las tareas almacenadas en SQLite.
+  // Cargar todas las tareas
   Future<void> _cargarTareas() async {
     try {
       final registros = await _db.consultarTareas();
@@ -49,41 +49,162 @@ class _TareasPageState extends State<TareasPage> {
 
 
 
-Future<void> _agregarTarea() async {
-    final titulo = _tituloController.text;
+  Future<void> _agregarTarea() async {
+      final titulo = _tituloController.text;
 
-    try {
-      // Guardar la tarea
-      await _db.agregarTarea(titulo);
+      try {
+        await _db.agregarTarea(titulo); // Guardar la tarea
+        if (!mounted) return;
 
-      if (!mounted) return;
+        _tituloController.clear(); // Limpiar el textbox
 
-      // Limpiar el campo de texto.
-      _tituloController.clear();
-
-      // Actualizar la lista con los datos guardados.
-      await _cargarTareas();
-    } on ArgumentError {
-      if (!mounted) return;
-      _pendiente('Escribe un título válido.');
-    } catch (e) {
-      if (!mounted) return;
-      _pendiente('Error al guardar la tarea: $e');
+        // Actualizar la lista 
+        await _cargarTareas();
+      } on ArgumentError {
+        if (!mounted) return;
+        _pendiente('Escribe un título válido.');
+      } catch (e) {
+        if (!mounted) return;
+        _pendiente('Error al guardar la tarea: $e');
+      }
     }
-  }
 
 
-  void _alternarCompletada(Tarea tarea, bool completada) {
-    _pendiente('Implementar actualización de tarea');
+  
+  Future<void> _alternarCompletada(Tarea tarea, bool completada) async {
+      try {
+        final filasActualizadas = await _db.actualizarEstado(tarea.id, completada,);
+        if (!mounted) return;
+        if (filasActualizadas == 0) {
+          _pendiente('No se encontró la tarea.');
+          return;
+      }
+
+        // Volver a consultar 
+        await _cargarTareas();
+      } catch (e) {
+        if (!mounted) return;
+
+        _pendiente('Error: $e');
+      }
+    }
+
+
+  
+  Future<void> _editarTarea(Tarea tarea) async {
+      String tituloEditado = tarea.titulo;
+
+      final nuevoTitulo = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Editar tarea'),
+            content: TextFormField(
+              initialValue: tarea.titulo,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Título de la tarea',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (valor) {
+                tituloEditado = valor;
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                },
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, tituloEditado);
+                },
+                child: const Text('Guardar'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (!mounted || nuevoTitulo == null) return;
+
+      try {
+        // Actualizar el títuloo
+        final filasActualizadas = await _db.editarTitulo(tarea.id, nuevoTitulo);
+        if (!mounted) return;
+        if (filasActualizadas == 0) {
+          _pendiente('No se encontró la tarea.');
+          return;
+        }
+
+        // Consultar para actualizar la pantalla.
+        await _cargarTareas();
+
+        if (!mounted) return;
+
+        _pendiente('Tarea actualizada correctamente.');
+      } on ArgumentError {
+        if (!mounted) return;
+        _pendiente('El título no puede estar vacío.');
+      } catch (e) {
+        if (!mounted) return;
+        _pendiente('Error $e');
+      }
+    }
+
+
+  
+  Future<void> _eliminarTarea(Tarea tarea) async {
+      // confirmación antes de eliminar.
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Eliminar tarea'),
+            content: Text('¿Seguro que deseas eliminar "${tarea.titulo}"?'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, false);
+                },
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, true);
+                },
+                child: const Text('Eliminar'),
+              ),
+            ],
+          );
+        },
+      );
+
+      // Si cancela
+      if (!mounted || confirmar != true) return;
+
+      try {
+        final filasEliminadas = await _db.eliminarTarea(tarea.id); // Eliminar la tarea por id
+        if (!mounted) return;
+        if (filasEliminadas == 0) {
+          _pendiente('No se encontró la tarea.');
+          return;
+        }
+
+        // Actualizar las tareas 
+        await _cargarTareas();
+        if (!mounted) return;
+
+        _pendiente('Tarea eliminada correctamente.');
+      } catch (e) {
+        if (!mounted) return;
+
+        _pendiente('Error: $e');
+      }
   }
 
-  void _editarTarea(Tarea tarea) {
-    _pendiente('Implementar edición de título');
-  }
-
-  void _eliminarTarea(Tarea tarea) {
-    _pendiente('Implementar eliminación de tarea');
-  }
 
   void _pendiente(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -94,7 +215,7 @@ Future<void> _agregarTarea() async {
   @override
   void dispose() {
     _tituloController.dispose();
-    _db.close(); // Cerrar la conexión cuando se destruye la pantalla
+    _db.close(); // Cerrar la conexión 
     super.dispose();
   }
 

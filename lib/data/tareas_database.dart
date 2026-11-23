@@ -57,6 +57,36 @@ class TareasDatabase extends _$TareasDatabase {
     return select(tareas).get();
   }
 
+
+  // UPDATE: Modificar el título de una tarea.
+  Future<int> editarTitulo(int id, String nuevoTitulo) {
+    final tituloLimpio = nuevoTitulo.trim();
+
+    if (tituloLimpio.isEmpty) {
+      throw ArgumentError('El título no puede estar vacío.');
+    }
+
+    return (update(tareas)..where((tarea) => tarea.id.equals(id))).write(
+      TareasCompanion(titulo: Value(tituloLimpio)),
+    );
+  }
+
+
+  // UPDATE: Cambiar el estado de una tarea.
+  Future<int> actualizarEstado(int id, bool completada) {
+    return (update(tareas)..where((tarea) => tarea.id.equals(id))).write(
+      TareasCompanion(completada: Value(completada)),
+    );
+  }
+
+
+  // DELETE: Eliminar una tarea por su id.
+  Future<int> eliminarTarea(int id) {
+    return (delete(tareas)..where((tarea) => tarea.id.equals(id))).go();
+  }
+
+
+
   @override
   int get schemaVersion => 1;
 }
